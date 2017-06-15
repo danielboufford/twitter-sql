@@ -1,36 +1,45 @@
-"use strict"
+'use strict';
+var express = require('express');
+var app = express();
+var morgan = require('morgan');
+var nunjucks = require('nunjucks');
+var makesRouter = require('./routes');
+var fs = require('fs');
+var path = require('path');
+var mime = require('mime');
+var bodyParser = require('body-parser');
+var socketio = require('socket.io');
 
-const express = require( 'express' );
-const nunjucks = require( 'nunjucks' );
-const bodyParser = require('body-parser');
+// templating boilerplate setup
+app.engine('html', nunjucks.render); // how to render html templates
+app.set('view engine', 'html'); // what file extension do our templates have
+nunjucks.configure('views', { noCache: true }); // where to find the views, caching off
 
-//index.js
-const routes = require('./routes');
+// logging middleware
+app.use(morgan('dev'));
 
-const app = express();
-const PORT = 3000;
+// body parsing middleware
+app.use(bodyParser.urlencoded({ extended: true })); // for HTML form submits
+app.use(bodyParser.json()); // would be for AJAX requests
 
 
-app.set('view engine', 'html');
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-
-//use nunjucks on app.js
-nunjucks.configure('views', {
-  autoescape: true,
-  express: app,
-  noCache: true
+// start the server
+var server = app.listen(1337, function(){
+  console.log('listening on port 1337');
 });
+var io = socketio.listen(server);
 
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '/public')));
 
-//will take in the routes declared in a seperate file ./routes/index.js
-app.use('/', routes);
+// modular routing that uses io inside it
+app.use('/', makesRouter(io));
 
-app.listen(PORT, ()=>{
-
-  console.log(`Server is now running on ${PORT}`);
-
-});
-
-
+// // manually-written static file middleware
+// app.use(function(req, res, next){
+//   var mimeType = mime.lookup(req.path);
+//   fs.readFile('./public' + req.path, function(err, fileBuffer){
+//     if (err) return next();
+//     res.header('Content-Type', mimeType);
+//     res.send(fileBuffer);
+//   });
+// });
